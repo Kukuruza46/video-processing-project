@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Обработка видео</title>
+</head>
+<body>
+    <h1>Загрузите видео для обработки</h1>
+
+    <h2>1. Загрузить видео</h2>
+    <form id="uploadForm" enctype="multipart/form-data">
+        <input type="file" name="file" id="fileInput">
+        <button type="button" onclick="uploadVideo()">Загрузить</button>
+    </form>
+
+    <div id="uploadStatus" style="margin-top: 10px; color: green; font-weight: bold;"></div>
+
+    <h2>2. Просмотр обработанного видео</h2>
+    <button onclick="startStream()">Показать видео</button>
+
+    <h3>Обработка видео:</h3>
+    <img id="videoStream" style="max-width: 100%; border: 1px solid black;" />
+
+    <div id="peopleCount" style="margin-top: 20px; font-size: 20px; font-weight: bold; color: blue;"></div>
+
+    <div style="display: flex; flex-direction: row; justify-content: space-between; align-items: flex-start; margin-top: 20px;">
+        <!-- Логи -->
+        <div id="peopleLog" style="flex: 1; margin-right: 20px; font-size: 18px;">
+            <h3>Логи:</h3>
+            <ul id="logList"></ul>
+        </div>
+
+        <!-- События объектов -->
+        <div id="objectLog" style="flex: 1; font-size: 18px;">
+            <h3>События объектов:</h3>
+            <ul id="objectList"></ul>
+        </div>
+    </div>
+
+    <script>
+        function uploadVideo() {
+            const fileInput = document.getElementById("fileInput");
+            const uploadStatus = document.getElementById("uploadStatus");
+
+            if (!fileInput.files.length) {
+                uploadStatus.style.color = "red";
+                uploadStatus.innerText = "Пожалуйста, выберите файл.";
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append("file", fileInput.files[0]);
+
+            fetch("/upload", {
+                method: "POST",
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                uploadStatus.style.color = "green";
+                uploadStatus.innerText = data.message;
+            })
+            .catch(error => {
+                console.error("Ошибка загрузки:", error);
+                uploadStatus.style.color = "red";
+                uploadStatus.innerText = "Ошибка загрузки видео.";
+            });
+        }
+
+        const ws = new WebSocket("ws://127.0.0.1:8000/ws");
+
+        ws.onmessage = function (event) {
+            const data = JSON.parse(event.data);
+
+            if (data.people_count !== undefined) {
+                document.getElementById("peopleCount").innerText = "Количество людей: " + data.people_count;
+
+                const logList = document.getElementById("logList");
+                const newLog = document.createElement("li");
+                newLog.textContent = `Время: ${data.timestamp}, Людей: ${data.people_count}`;
+                logList.appendChild(newLog);
+
+                if (logList.children.length > 20) {
+                    logList.removeChild(logList.firstChild);
+                }
+            }
+
+            if (data.event !== undefined) {
+                const objectList = document.getElementById("objectList");
+                const newEvent = document.createElement("li");
+                newEvent.textContent = data.event;
+                objectList.appendChild(newEvent);
+
+                if (objectList.children.length > 20) {
+                    objectList.removeChild(objectList.firstChild);
+                }
+            }
+        };
+
+        ws.onerror = function (error) {
+            console.error("Ошибка WebSocket:", error);
+        };
+
+        function startStream() {
+            const videoStream = document.getElementById("videoStream");
+            videoStream.src = "/video_stream";
+        }
+    </script>
+</body>
+</html>
